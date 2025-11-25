@@ -1,0 +1,724 @@
+﻿<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>聖誕交換禮物工具</title>
+    <!-- 載入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 載入 Tone.js 函式庫以處理音效 -->
+    <script src="https://cdn.jsdelivr.net/npm/tone@14.7.71/build/Tone.min.js"></script>
+    <style>
+        /* 聖誕主題顏色配置 */
+        :root {
+            --christmas-red: #B91C1C;
+            --christmas-green: #059669;
+            --christmas-gold: #FCD34D;
+            --dark-bg: #1F2937;
+        }
+
+        /* 自定義 Tailwind 配置 */
+        /* 使用 Inter 字體 */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* 禮物編號樣式 */
+        .gift-number {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 4rem;
+            height: 4rem;
+            margin: 0.5rem;
+            font-size: 1.5rem;
+            font-weight: bold;
+            border-radius: 0.75rem;
+            border: 3px solid var(--christmas-gold);
+            color: white;
+            transition: all 0.3s ease;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            /* Ensure the info container is centered if needed */
+            flex-shrink: 0;
+        }
+
+        .waiting-bg {
+            background-color: #4B5563;
+        }
+
+        .receiver-bg {
+            background-color: var(--christmas-red);
+            animation: pulse-red 1.5s infinite;
+        }
+
+        .giver-bg {
+            background-color: var(--christmas-green);
+            animation: pulse-green 1.5s infinite;
+        }
+
+        .gifted-bg {
+            background-color: #10B981;
+            border: 3px solid #065F46;
+        }
+
+        @keyframes pulse-red {
+            0%, 100% {
+                box-shadow: 0 0 10px var(--christmas-red), 0 0 20px rgba(185, 28, 28, 0.7);
+            }
+
+            50% {
+                box-shadow: 0 0 20px var(--christmas-red), 0 0 30px rgba(185, 28, 28, 0.9);
+            }
+        }
+
+        @keyframes pulse-green {
+            0%, 100% {
+                box-shadow: 0 0 10px var(--christmas-green), 0 0 20px rgba(5, 150, 105, 0.7);
+            }
+
+            50% {
+                box-shadow: 0 0 20px var(--christmas-green), 0 0 30px rgba(5, 150, 105, 0.9);
+            }
+        }
+
+        .main-button {
+            background-color: var(--christmas-gold);
+            color: var(--christmas-red);
+            font-weight: bold;
+            padding: 0.75rem 2rem;
+            border-radius: 9999px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+            transition: transform 0.1s ease;
+        }
+
+            .main-button:hover {
+                background-color: #FBBF24;
+                transform: scale(1.02);
+            }
+
+            .main-button:active {
+                transform: scale(0.98);
+            }
+
+        .area-title {
+            color: var(--christmas-gold);
+            font-size: 1.5rem;
+            border-bottom: 2px solid var(--christmas-red);
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .result-card {
+            background-color: var(--christmas-red);
+            border: 2px solid var(--christmas-gold);
+            color: white;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+        }
+
+        .name-display {
+            font-size: 1rem;
+            line-height: 1.25rem;
+            height: 1.25rem; /* Fixed height to prevent CLS */
+        }
+    </style>
+</head>
+<body class="bg-dark-bg min-h-screen p-4 sm:p-8 text-white">
+
+    <!-- 標題與裝飾 -->
+    <header class="text-center mb-8">
+        <h1 class="text-4xl sm:text-5xl font-extrabold text-white mb-2" style="text-shadow: 2px 2px 4px var(--christmas-green);">
+            🎄 聖誕交換禮物工具 🎁
+        </h1>
+        <p class="text-sm text-gray-400">禮物循環抽籤系統</p>
+    </header>
+
+    <!-- 主容器 -->
+    <main id="app-container" class="max-w-6xl mx-auto bg-gray-800 p-6 rounded-xl shadow-2xl border-4 border-christmas-green">
+
+        <!-- 初始輸入區 (Phase 1) -->
+        <div id="input-screen" class="text-center p-8">
+            <h2 class="text-3xl font-semibold mb-6 text-christmas-gold">設定禮物數量</h2>
+            <div class="mb-8 max-w-sm mx-auto">
+                <label for="gift-count" class="block text-lg mb-2 text-gray-300">總共禮物數量 (1-99):</label>
+                <input type="number" id="gift-count" min="2" max="99" value="10"
+                       class="w-full p-3 text-2xl text-center bg-gray-700 border-2 border-christmas-gold rounded-lg focus:outline-none focus:ring-4 focus:ring-christmas-red transition duration-300 text-white" />
+            </div>
+            <button id="start-button" onclick="startGame()" class="main-button text-2xl">
+                開始交換禮物
+            </button>
+            <p id="error-message" class="text-red-400 mt-4 hidden">請輸入有效的禮物數量 (至少 2 個)。</p>
+        </div>
+
+        <!-- 遊戲主畫面 (Phase 2 & 3) -->
+        <div id="game-screen" class="hidden">
+
+            <!-- 狀態區域顯示 -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+
+                <!-- 等待禮物中 -->
+                <div class="bg-gray-700 p-4 rounded-lg border-2 border-gray-600">
+                    <h3 class="area-title">1. 等待禮物中</h3>
+                    <div id="waiting-area" class="flex flex-wrap h-28 overflow-y-auto">
+                        <!-- 禮物號碼將顯示在這裡 -->
+                    </div>
+                </div>
+
+                <!-- 收禮物 (Receiver) -->
+                <div class="bg-gray-700 p-4 rounded-lg border-2 border-christmas-red">
+                    <h3 class="area-title text-christmas-red">2. 收禮物 (Receiver)</h3>
+                    <div id="receiver-area" class="flex flex-wrap justify-center items-center h-28">
+                        <div id="receiver-info-container" class="flex flex-col items-center">
+                            <div id="receiver-number" class="gift-number receiver-bg">?</div>
+                            <!-- 顯示名字 -->
+                            <div id="receiver-name-display" class="name-display text-sm mt-1 text-christmas-gold font-bold h-4"></div>
+                        </div>
+                    </div>
+                    <!-- Receiver Name Input -->
+                    <div id="receiver-name-input-area" class="mt-2 hidden">
+                        <input type="text" id="receiver-name-input" placeholder="輸入收禮人名字..."
+                               class="w-full p-2 text-sm bg-gray-600 border border-gray-500 rounded text-white mb-2" oninput="checkNameInput('receiver')">
+                        <button id="record-receiver-name-button" onclick="recordName('receiver')" class="w-full bg-christmas-red hover:bg-christmas-red/80 text-white p-2 rounded-lg text-sm font-semibold disabled:opacity-50" disabled>
+                            確認名字並繼續
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 送禮物 (Giver) -->
+                <div class="bg-gray-700 p-4 rounded-lg border-2 border-christmas-green">
+                    <h3 class="area-title text-christmas-green">3. 送禮物 (Giver)</h3>
+                    <div id="giver-area" class="flex flex-wrap justify-center items-center h-28">
+                        <div id="giver-info-container" class="flex flex-col items-center">
+                            <div id="giver-number" class="gift-number giver-bg">?</div>
+                            <!-- 顯示名字 -->
+                            <div id="giver-name-display" class="name-display text-sm mt-1 text-christmas-gold font-bold h-4"></div>
+                        </div>
+                    </div>
+                    <!-- Giver Name Input -->
+                    <div id="giver-name-input-area" class="mt-2 hidden">
+                        <input type="text" id="giver-name-input" placeholder="輸入送禮人名字..."
+                               class="w-full p-2 text-sm bg-gray-600 border border-gray-500 rounded text-white mb-2" oninput="checkNameInput('giver')">
+                        <button id="record-giver-name-button" onclick="recordName('giver')" class="w-full bg-christmas-green hover:bg-christmas-green/80 text-white p-2 rounded-lg text-sm font-semibold disabled:opacity-50" disabled>
+                            確認名字並繼續
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 已得到禮物 -->
+                <div class="bg-gray-700 p-4 rounded-lg border-2 border-emerald-500">
+                    <h3 class="area-title text-emerald-400">4. 已得到禮物</h3>
+                    <div id="gifted-area" class="flex flex-wrap h-28 overflow-y-auto">
+                        <!-- 禮物號碼將顯示在這裡 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 動作按鈕 -->
+            <div class="text-center mt-6">
+                <button id="action-button" onclick="nextStep()" class="main-button text-xl">
+                    ...
+                </button>
+            </div>
+
+            <!-- 流程提示 -->
+            <p id="flow-tip" class="text-center text-sm mt-4 text-gray-400 h-6">準備開始交換！</p>
+        </div>
+
+        <!-- 結果畫面 (Phase 4) -->
+        <div id="results-screen" class="hidden p-8">
+            <h2 class="text-3xl font-semibold mb-6 text-christmas-gold text-center">🎉 交換禮物結果清單 🎉</h2>
+            <div id="results-list" class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-xl mx-auto">
+                <!-- 結果將顯示在這裡 -->
+            </div>
+            <p id="summary-tip" class="text-center text-lg mt-8 text-christmas-red font-bold">禮物循環圓滿完成！</p>
+            <div class="text-center mt-6 flex justify-center space-x-4">
+                <button onclick="exportToCsv()" class="main-button bg-indigo-600 hover:bg-indigo-700 text-white text-lg">
+                    ⬇️ 匯出為 CSV (可匯入 Google 試算表)
+                </button>
+                <button onclick="window.location.reload()" class="main-button bg-christmas-green text-white text-lg">
+                    重新開始
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // 全域狀態變數
+        var N = 0; // 禮物總數
+        // 新增兩個狀態：'awaitingNameReceiver' 和 'awaitingNameGiver'
+        var gameState = 'input'; // 'input', 'drawing1', 'awaitingNameReceiver', 'drawing2', 'awaitingNameGiver', 'cycle', 'drawingNextGiver', 'final', 'done', 'results'
+        var waitingNumbers = []; // 等待區 (陣列)
+        var receiver = null; // 當前收禮人 (數字)
+        var giver = null; // 當前送禮人 (數字)
+        var giftedList = []; // 已得到禮物區 (陣列)
+        var initialReceiver = null; // 第一個收禮人 (將是最後的送禮人)
+        var giftPairs = []; // 最終結果儲存 (Giver -> Receiver)
+        var stepCount = 0; // 流程計數器
+        var synth = null; // Tone.js 合成器
+        var participantNames = {}; // 儲存號碼與名字的對應關係 { '1': 'NameA', '2': 'NameB', ... }
+
+        // UI 元素
+        const ui = {
+            inputScreen: document.getElementById('input-screen'),
+            gameScreen: document.getElementById('game-screen'),
+            resultsScreen: document.getElementById('results-screen'),
+            giftCountInput: document.getElementById('gift-count'),
+            errorMessage: document.getElementById('error-message'),
+            actionButton: document.getElementById('action-button'),
+            waitingArea: document.getElementById('waiting-area'),
+            receiverNumber: document.getElementById('receiver-number'),
+            giverNumber: document.getElementById('giver-number'),
+            giftedArea: document.getElementById('gifted-area'),
+            flowTip: document.getElementById('flow-tip'),
+            resultsList: document.getElementById('results-list'),
+
+            // 新增名字相關 UI 元素
+            receiverNameDisplay: document.getElementById('receiver-name-display'),
+            receiverNameInputArea: document.getElementById('receiver-name-input-area'),
+            receiverNameInput: document.getElementById('receiver-name-input'),
+            recordReceiverNameButton: document.getElementById('record-receiver-name-button'),
+
+            giverNameDisplay: document.getElementById('giver-name-display'),
+            giverNameInputArea: document.getElementById('giver-name-input-area'),
+            giverNameInput: document.getElementById('giver-name-input'),
+            recordGiverNameButton: document.getElementById('record-giver-name-button'),
+        };
+
+        // --- 音效功能 ---
+
+        /**
+         * 確保音訊環境啟動並播放抽獎音效
+         */
+        function setupAudioAndPlay() {
+            // 第一次互動時才啟動 Tone.js 語境 (瀏覽器安全策略)
+            if (Tone.context.state !== 'running') {
+                Tone.start().then(() => {
+                    console.log("Audio Context started.");
+                    playDrawSound();
+                }).catch(e => console.error("Failed to start Tone.js audio context:", e));
+            } else {
+                playDrawSound();
+            }
+        }
+
+        /**
+         * 播放清脆的撥弦音效
+         */
+        function playDrawSound() {
+            try {
+                if (!synth) {
+                    // 使用 PluckSynth 模擬清脆的撥弦或鈴鐺聲
+                    synth = new Tone.PluckSynth({
+                        attackNoise: 0.8,
+                        dampening: 2000,
+                        resonance: 0.95,
+                    }).toDestination();
+                }
+                // 根據流程播放不同音高增加變化
+                let note = "C5"; // 基礎音
+                if (gameState.includes('drawing')) {
+                    note = "G4"; // 抽籤音較低沉
+                } else if (gameState === 'cycle' || gameState === 'final') {
+                    note = "C5"; // 交換音較明亮
+                }
+
+                // 播放音符
+                synth.triggerAttackRelease(note, "16n");
+            } catch (e) {
+                console.warn("Audio playback failed:", e.message);
+            }
+        }
+
+
+        // --- 核心功能 ---
+
+        /**
+         * 隨機抽取一個號碼並從陣列中移除
+         * @param {number[]} arr - 號碼陣列
+         * @returns {number | null} 抽出的號碼
+         */
+        function drawNumber(arr) {
+            if (arr.length === 0) return null;
+            const index = Math.floor(Math.random() * arr.length);
+            const drawnNumber = arr[index];
+            arr.splice(index, 1);
+            return drawnNumber;
+        }
+
+        /**
+         * 開始遊戲，設定禮物總數並初始化牌組
+         */
+        function startGame() {
+            N = parseInt(ui.giftCountInput.value);
+            if (isNaN(N) || N < 2) {
+                ui.errorMessage.classList.remove('hidden');
+                return;
+            }
+            ui.errorMessage.classList.add('hidden');
+            console.log(`[Game Start] 總禮物數: ${N}。正在初始化...`);
+
+            // 初始化禮物號碼 (1 到 N)
+            waitingNumbers = Array.from({ length: N }, (_, i) => i + 1);
+            waitingNumbers.sort(() => Math.random() - 0.5);
+            giftPairs = []; // 重置結果
+            participantNames = {}; // 重置名字紀錄
+
+            // 進入遊戲畫面
+            gameState = 'drawing1';
+            ui.inputScreen.classList.add('hidden');
+            ui.gameScreen.classList.remove('hidden');
+            stepCount = 0;
+            console.log(`[Game Start] 狀態轉換為: ${gameState}。等待抽取第一個收禮人。`);
+            setupAudioAndPlay();
+
+            updateUI();
+        }
+
+        /**
+         * 檢查名字輸入框是否有內容，並啟用確認按鈕
+         * @param {string} role - 'receiver' or 'giver'
+         */
+        function checkNameInput(role) {
+            const input = role === 'receiver' ? ui.receiverNameInput : ui.giverNameInput;
+            const button = role === 'receiver' ? ui.recordReceiverNameButton : ui.recordGiverNameButton;
+            const name = input.value.trim();
+            button.disabled = name.length === 0;
+        }
+
+        /**
+         * 記錄名字並從等待輸入狀態轉換到下一個遊戲狀態
+         * @param {string} role - 'receiver' or 'giver'
+         */
+        function recordName(role) {
+            const input = role === 'receiver' ? ui.receiverNameInput : ui.giverNameInput;
+            const currentNumber = role === 'receiver' ? receiver : giver;
+            const name = input.value.trim();
+
+            if (name.length > 0 && currentNumber !== null) {
+                // 1. 儲存名字
+                participantNames[currentNumber] = name;
+                console.log(`[Name Recorded] ${role} ${currentNumber} assigned to: ${name}`);
+
+                // 2. 決定下一步狀態
+                if (gameState === 'awaitingNameReceiver') {
+                    // 初始收禮人名字記錄完成，進入抽取第一個送禮人的步驟
+                    gameState = 'drawing2';
+                    ui.flowTip.textContent = `收禮人 ${currentNumber} 號 (即 ${name}) 名字已記錄。請點擊抽取第一個送禮人。`;
+                } else if (gameState === 'awaitingNameGiver') {
+                    // 送禮人名字記錄完成，進入交換環節
+                    gameState = 'cycle';
+                    const receiverName = participantNames[receiver] || `${receiver} 號`;
+                    ui.flowTip.textContent = `送禮人 ${currentNumber} 號 (即 ${name}) 名字已記錄。請點擊進行交換：${name} 送給 ${receiverName}。`;
+                } else {
+                    console.error("Invalid state for recordName:", gameState);
+                    ui.flowTip.textContent = '[錯誤] 名字記錄流程錯誤。';
+                    return;
+                }
+
+                // 3. 隱藏輸入 UI 並啟用主按鈕
+                ui.receiverNameInputArea.classList.add('hidden');
+                ui.giverNameInputArea.classList.add('hidden');
+                ui.actionButton.disabled = false;
+
+                updateUI();
+            } else {
+                ui.flowTip.textContent = '[錯誤] 請輸入有效的名字！';
+            }
+        }
+
+
+        /**
+         * 進入下一步流程
+         */
+        function nextStep() {
+            // 每次點擊都播放音效
+            setupAudioAndPlay();
+
+            stepCount++;
+            console.log(`[Next Step] Step: ${stepCount}, Current State: ${gameState}, Waiting: ${waitingNumbers.length}, Receiver: ${receiver}, Giver: ${giver}`);
+
+            try {
+                switch (gameState) {
+                    case 'drawing1':
+                        // 步驟 1: 抽取第一個收禮人 (Receiver)
+                        receiver = drawNumber(waitingNumbers);
+                        initialReceiver = receiver; // 記錄第一個收禮人
+                        gameState = 'awaitingNameReceiver';
+                        ui.flowTip.textContent = `抽取了 ${receiver} 號作為第一個收禮人。請輸入他的名字。`;
+                        // 啟用 Receiver 名字輸入 UI
+                        ui.actionButton.disabled = true;
+                        ui.receiverNameInput.value = '';
+                        ui.receiverNameInputArea.classList.remove('hidden');
+                        ui.receiverNameInput.focus();
+                        break;
+
+                    case 'drawing2':
+                        // 步驟 2: 抽取第一個送禮人 (Giver)
+                        giver = drawNumber(waitingNumbers);
+                        gameState = 'awaitingNameGiver';
+                        ui.flowTip.textContent = `抽取了 ${giver} 號作為第一個送禮人。請輸入他的名字。`;
+                        // 啟用 Giver 名字輸入 UI
+                        ui.actionButton.disabled = true;
+                        ui.giverNameInput.value = '';
+                        ui.giverNameInputArea.classList.remove('hidden');
+                        ui.giverNameInput.focus();
+                        break;
+
+                    case 'cycle':
+                        // 步驟 3: 送禮人送出禮物給收禮人 (執行交換)
+                        if (giver === null || receiver === null) throw new Error("Giver or Receiver is missing in cycle.");
+
+                        giftPairs.push({ giver: giver, receiver: receiver });
+                        const gName = participantNames[giver];
+                        const rName = participantNames[receiver];
+                        ui.flowTip.textContent = `${gName} 號送禮物給 ${rName} 號！交換完成。`;
+
+                        // 步驟 4: 收禮人進入「已得到禮物」區
+                        giftedList.push(receiver);
+
+                        // 步驟 5: 送禮人成為新的收禮人 (Receiver)
+                        const previousGiver = giver;
+                        receiver = giver;
+                        giver = null; // 清空 Giver 區
+
+                        // 步驟 6: 決定下一步狀態
+                        if (waitingNumbers.length > 0) {
+                            // 還有待抽取的號碼
+                            gameState = 'drawingNextGiver';
+                            ui.flowTip.textContent += `現在 ${rName} 號是收禮人。請點擊按鈕，抽取下一位送禮人。`;
+                        } else {
+                            // 等待區抽完，進入最終環節
+                            gameState = 'final';
+                            const finalGiverName = participantNames[initialReceiver];
+                            ui.flowTip.textContent = `等待區已空。 ${rName} 號將收到 ${finalGiverName} 號的禮物。`;
+                        }
+                        break;
+
+                    case 'drawingNextGiver':
+                        // 步驟 7: 抽取下一個送禮人 (Giver)
+                        giver = drawNumber(waitingNumbers);
+                        if (giver !== null) {
+                            gameState = 'awaitingNameGiver'; // 等待名字輸入
+                            ui.flowTip.textContent = `新的送禮人 ${giver} 號已抽取！請輸入他的名字。`;
+                            // 啟用 Giver 名字輸入 UI
+                            ui.actionButton.disabled = true;
+                            ui.giverNameInput.value = '';
+                            ui.giverNameInputArea.classList.remove('hidden');
+                            ui.giverNameInput.focus();
+                        } else {
+                            // 安全檢查，正常情況不應發生
+                            gameState = 'final';
+                            ui.flowTip.textContent = `等待區已空。 ${participantNames[receiver]} 號將收到 ${participantNames[initialReceiver]} 號的禮物。`;
+                        }
+                        break;
+
+                    case 'final':
+                        // 步驟 8: 最終循環交換
+                        if (receiver === null || initialReceiver === null) throw new Error("Receiver or Initial Receiver is missing in final step.");
+
+                        // 設定 Giver 為最初的 Receiver
+                        giver = initialReceiver;
+
+                        // 記錄最後一組交換
+                        giftPairs.push({ giver: giver, receiver: receiver });
+                        const finalReceiverName = participantNames[receiver];
+                        const finalGiverName = participantNames[giver];
+                        ui.flowTip.textContent = `最後一組交換：${finalGiverName} 號送禮物給 ${finalReceiverName} 號。`;
+
+                        // 最後的 Receiver 進入「已得到禮物」區
+                        giftedList.push(receiver);
+
+                        // 清理狀態
+                        receiver = null;
+                        giver = null;
+
+                        if (giftedList.length === N) {
+                            gameState = 'done';
+                            ui.flowTip.textContent = `所有 ${N} 個禮物都已交換完成！`;
+                        } else {
+                            throw new Error("Final check failed: giftedList length does not match N.");
+                        }
+                        break;
+
+                    case 'done':
+                        // 步驟 9: 顯示最終結果
+                        gameState = 'results';
+                        renderResults();
+                        break;
+
+                    // 處理名字等待狀態下的按鈕點擊 (應被 recordName 處理)
+                    case 'awaitingNameReceiver':
+                    case 'awaitingNameGiver':
+                        ui.flowTip.textContent = '[請注意] 請先輸入名字，再點擊下方的「確認名字並繼續」按鈕。';
+                        break;
+                }
+            } catch (e) {
+                console.error("Game Error:", e);
+                ui.flowTip.textContent = `[嚴重錯誤] 遊戲流程出錯: ${e.message}`;
+            }
+
+            updateUI();
+        }
+
+        // --- 介面渲染 ---
+
+        /**
+         * 渲染指定區域的禮物號碼
+         */
+        function renderNumbers(element, numbers, baseClass) {
+            element.innerHTML = numbers.map(num =>
+                `<div class="gift-number ${baseClass}" title="${participantNames[num] || '號碼' + num}">${num}</div>`
+            ).join('');
+        }
+
+        /**
+         * 渲染最終結果清單 (使用名字)
+         */
+        function renderResults() {
+            ui.resultsList.innerHTML = giftPairs.map(pair => {
+                const giverName = participantNames[pair.giver] || `${pair.giver} 號 (名字未記錄)`;
+                const receiverName = participantNames[pair.receiver] || `${pair.receiver} 號 (名字未記錄)`;
+
+                return `<div class="result-card">
+                        🎁 ${giverName} 送禮物給 ➡️ ${receiverName}
+                        <div class="text-xs text-gray-200 mt-1">(${pair.giver} 號 $\to$ ${pair.receiver} 號)</div>
+                    </div>`;
+            }).join('');
+        }
+
+        /**
+         * 將結果清單匯出為 CSV 檔案 (包含名字)
+         */
+        function exportToCsv() {
+            if (giftPairs.length === 0) {
+                ui.flowTip.textContent = '[注意] 沒有交換紀錄可以匯出！';
+                console.warn("No data to export.");
+                return;
+            }
+
+            const headers = ['送禮人編號', '送禮人姓名', '收禮人編號', '收禮人姓名'];
+            let csv = headers.join(',') + '\n';
+
+            giftPairs.forEach(pair => {
+                // 使用雙引號包裹名字，避免名字中包含逗號導致 CSV 格式錯誤
+                const giverName = participantNames[pair.giver] ? `"${participantNames[pair.giver]}"` : '名字未記錄';
+                const receiverName = participantNames[pair.receiver] ? `"${participantNames[pair.receiver]}"` : '名字未記錄';
+
+                csv += `${pair.giver},${giverName},${pair.receiver},${receiverName}\n`;
+            });
+
+            // 建立 Blob 物件，使用 BOM (\ufeff) 確保 Excel/Google Sheets 開啟時中文不會亂碼
+            const blob = new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8;' });
+
+            // 建立下載連結
+            const link = document.createElement('a');
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', '聖誕交換禮物結果_' + new Date().toISOString().slice(0, 10) + '.csv');
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                ui.flowTip.textContent = '[完成] 交換結果已匯出為 CSV 檔案！';
+            } else {
+                console.error("Browser does not support download attribute.");
+                ui.flowTip.textContent = '[錯誤] 您的瀏覽器不支援下載功能，請嘗試複製結果。';
+            }
+        }
+
+
+        /**
+         * 更新所有介面元素
+         */
+        function updateUI() {
+            // 1. 更新四個區域
+            renderNumbers(ui.waitingArea, waitingNumbers, 'waiting-bg');
+            renderNumbers(ui.giftedArea, giftedList, 'gifted-bg');
+
+            // 2. 更新 Receiver / Giver 數字和名字顯示
+            ui.receiverNumber.textContent = receiver !== null ? receiver : '?';
+            ui.receiverNumber.className = `gift-number ${receiver !== null ? 'receiver-bg' : 'waiting-bg'}`;
+            ui.receiverNameDisplay.textContent = receiver !== null && participantNames[receiver] ? participantNames[receiver] : '';
+
+            // 處理 Giver (Final 階段 Giver 是 initialReceiver)
+            const giverDisplay = (gameState === 'final' && giver === null && initialReceiver !== null) ? initialReceiver : giver;
+            const giverNumberToDisplay = giverDisplay !== null ? giverDisplay : '?';
+
+            ui.giverNumber.textContent = giverNumberToDisplay;
+            ui.giverNumber.className = `gift-number ${giverDisplay !== null ? 'giver-bg' : 'waiting-bg'}`;
+            ui.giverNameDisplay.textContent = giverDisplay !== null && participantNames[giverDisplay] ? participantNames[giverDisplay] : '';
+
+            // 3. 處理名字輸入框的顯示/隱藏
+            ui.receiverNameInputArea.classList.add('hidden');
+            ui.giverNameInputArea.classList.add('hidden');
+            ui.actionButton.disabled = false; // 預設啟用
+
+            switch (gameState) {
+                case 'awaitingNameReceiver':
+                    ui.receiverNameInputArea.classList.remove('hidden');
+                    ui.actionButton.disabled = true; // 名字輸入期間禁用主按鈕
+                    break;
+                case 'awaitingNameGiver':
+                    ui.giverNameInputArea.classList.remove('hidden');
+                    ui.actionButton.disabled = true; // 名字輸入期間禁用主按鈕
+                    break;
+                // 其他狀態下，名字輸入框都是隱藏的
+            }
+
+
+            // 4. 更新主動作按鈕文字和狀態
+            switch (gameState) {
+                case 'drawing1':
+                    ui.actionButton.textContent = "抽取第一個收禮人 (P1)";
+                    break;
+                case 'drawing2':
+                    ui.actionButton.textContent = "抽取第一個送禮人 (P2)";
+                    break;
+                case 'cycle':
+                    const rName = participantNames[receiver];
+                    const gName = participantNames[giver];
+                    ui.actionButton.textContent = `進行交換：${gName} 送給 ${rName}`;
+                    break;
+                case 'drawingNextGiver':
+                    ui.actionButton.textContent = "抽取下一位送禮人";
+                    break;
+                case 'final':
+                    const finalReceiverName = participantNames[receiver];
+                    const finalGiverName = participantNames[initialReceiver];
+                    ui.actionButton.textContent = `最終步驟：${finalGiverName} 送禮給 ${finalReceiverName}`;
+                    break;
+                case 'done':
+                    ui.actionButton.textContent = "交換完成！查看結果清單";
+                    break;
+                case 'results':
+                    // 隱藏遊戲畫面，顯示結果
+                    ui.gameScreen.classList.add('hidden');
+                    ui.resultsScreen.classList.remove('hidden');
+                    ui.actionButton.disabled = true;
+                    break;
+                case 'input':
+                    ui.actionButton.textContent = "開始交換禮物";
+                    ui.actionButton.disabled = false;
+                    break;
+                default:
+                    ui.actionButton.textContent = "等待動作";
+                    ui.actionButton.disabled = true;
+            }
+        }
+
+        // 初始 UI 渲染 (確保在頁面載入後)
+        document.addEventListener('DOMContentLoaded', () => {
+            ui.giftCountInput.focus();
+            ui.giftCountInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') startGame();
+            });
+            updateUI();
+        });
+
+    </script>
+</body>
+</html>
